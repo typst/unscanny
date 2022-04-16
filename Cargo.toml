@@ -1,4 +1,11 @@
 [package]
 name = "unscanny"
 version = "0.1.0"
+authors = ["Laurenz <laurmaedje@gmail.com>"]
 edition = "2021"
+description = "Painless string scanning."
+repository = "https://github.com/typst/unscanny"
+readme = "README.md"
+license = "MIT OR Apache-2.0"
+categories = ["parsing", "text-processing"]
+keywords = ["scanning", "tokenizing"]

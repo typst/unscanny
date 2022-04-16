@@ -1,4 +1,45 @@
-//! A crate for string scanning.
+/*!
+Painless string scanning.
+
+Basically, you want to use this if right now you're manually dealing with a
+`chars()` iterator but it's too much pain. More broadly speaking, it's
+useful in the following two situations:
+- You need to parse simple flat grammars (dates, times, custom stuff, ...) and
+  want an interface that's a bit more convenient to use than a simple char
+  iterator.
+- You're hand-writing a tokenizer.
+
+The `Scanner` keeps an internal cursor, allows you to peek around it, advance it
+beyond chars or other patterns  and easily slice substrings before and after the
+cursor.
+
+Note that the scanner doesn't have built-in support for parsing things like
+numbers. It's a level of abstraction below that and wouldn't want to mandate a
+specific number format. However, you can very easily build your required
+abstractions on top.
+
+# Example
+Recognizing and parsing a simple comma separated list of floats.
+```
+# use unscanny::Scanner;
+let mut s = Scanner::new(" +12 , -15.3, 14.3  ");
+let mut nums = vec![];
+while !s.done() {
+    s.eat_whitespace();
+    let start = s.cursor();
+    s.eat_if(['+', '-']);
+    s.eat_while(char::is_ascii_digit);
+    s.eat_if('.');
+    s.eat_while(char::is_ascii_digit);
+    nums.push(s.from(start).parse::<f64>().unwrap());
+    s.eat_whitespace();
+    s.eat_if(',');
+}
+assert_eq!(nums, [12.0, -15.3, 14.3]);
+```
+*/
+
+#![deny(missing_docs)]
 
 use std::fmt::{self, Debug, Formatter, Write};
 use std::ops::Range;
@@ -43,6 +84,7 @@ impl<'a> Scanner<'a> {
     /// The subslice before the cursor.
     #[inline]
     pub fn before(&self) -> &'a str {
+        // Safety: The cursor is always in-bounds and on a codepoint boundary.
         debug_assert!(self.string.is_char_boundary(self.cursor));
         unsafe { self.string.get_unchecked(.. self.cursor) }
     }
@@ -50,6 +92,7 @@ impl<'a> Scanner<'a> {
     /// The subslice after the cursor.
     #[inline]
     pub fn after(&self) -> &'a str {
+        // Safety: The cursor is always in-bounds and on a codepoint boundary.
         debug_assert!(self.string.is_char_boundary(self.cursor));
         unsafe { self.string.get_unchecked(self.cursor ..) }
     }
@@ -66,6 +109,10 @@ impl<'a> Scanner<'a> {
     /// boundary.
     #[inline]
     pub fn from(&self, start: usize) -> &'a str {
+        // Safety:
+        // - Snapping returns an in-bounds index that is on a codepoint boundary
+        // - The cursor is always in-bounds and on a codepoint boundary.
+        // - The start index is <= the end index due to the `min()`
         let start = self.snap(start).min(self.cursor);
         debug_assert!(self.string.is_char_boundary(start));
         debug_assert!(self.string.is_char_boundary(self.cursor));
@@ -78,6 +125,10 @@ impl<'a> Scanner<'a> {
     /// boundary.
     #[inline]
     pub fn to(&self, end: usize) -> &'a str {
+        // Safety:
+        // - Snapping returns an in-bounds index that is on a codepoint boundary
+        // - The cursor is always in-bounds and on a codepoint boundary.
+        // - The end index is >= the start index due to the `max()`
         let end = self.snap(end).max(self.cursor);
         debug_assert!(self.string.is_char_boundary(self.cursor));
         debug_assert!(self.string.is_char_boundary(end));
@@ -90,6 +141,9 @@ impl<'a> Scanner<'a> {
     /// boundary.
     #[inline]
     pub fn get(&self, range: Range<usize>) -> &'a str {
+        // Safety:
+        // - Snapping returns an in-bounds index that is on a codepoint boundary
+        // - The end index is >= the start index due to the `max()`
         let start = self.snap(range.start);
         let end = self.snap(range.end).max(start);
         debug_assert!(self.string.is_char_boundary(start));
@@ -157,6 +211,8 @@ impl<'a> Scanner<'a> {
     pub fn eat(&mut self) -> Option<char> {
         let peeked = self.peek();
         if let Some(c) = peeked {
+            // Safety: When `c` is right behind the cursor, there must be an
+            // in-bounds codepoint boundary at `self.cursor + c.len_utf8()`.
             self.cursor += c.len_utf8();
         }
         peeked
@@ -168,6 +224,8 @@ impl<'a> Scanner<'a> {
     pub fn uneat(&mut self) -> Option<char> {
         let unpeeked = self.before().chars().next_back();
         if let Some(c) = unpeeked {
+            // Safety: When `c` is right before the cursor, there must be an
+            // in-bounds codepoint boundary at `self.cursor - c.len_utf8()`.
             self.cursor -= c.len_utf8();
         }
         unpeeked
@@ -179,6 +237,8 @@ impl<'a> Scanner<'a> {
     #[inline]
     pub fn eat_if<T>(&mut self, mut pat: impl Pattern<T>) -> bool {
         if let Some(len) = pat.matches(self.after()) {
+            // Safety: The contract of `matches` guarantees that there is an
+            // in-bounds codepoint boundary at `len` bytes into `self.after()`.
             self.cursor += len;
             true
         } else {
@@ -193,6 +253,8 @@ impl<'a> Scanner<'a> {
     pub fn eat_while<T>(&mut self, mut pat: impl Pattern<T>) -> &'a str {
         let start = self.cursor;
         while let Some(len @ 1 ..) = pat.matches(self.after()) {
+            // Safety: The contract of `matches` guarantees that there is an
+            // in-bounds codepoint boundary at `len` bytes into `self.after()`.
             self.cursor += len;
         }
         self.from(start)
@@ -224,6 +286,8 @@ impl<'a> Scanner<'a> {
     #[track_caller]
     pub fn expect<T>(&mut self, mut pat: impl Pattern<T>) {
         if let Some(len) = pat.matches(self.after()) {
+            // Safety: The contract of `matches` guarantees that there is an
+            // in-bounds codepoint boundary at `len` bytes into `self.after()`.
             self.cursor += len;
         } else {
             pat.expected();
@@ -235,6 +299,8 @@ impl<'a> Scanner<'a> {
     /// Snaps into the bounds of the string and to the next character boundary.
     #[inline]
     pub fn jump(&mut self, target: usize) {
+        // Safety: Snapping returns an in-bounds index that is on a codepoint
+        // boundary.
         self.cursor = self.snap(target);
     }
 }
@@ -243,6 +309,10 @@ impl<'a> Scanner<'a> {
     /// Snaps an index in-bounds and to the next codepoint boundary.
     #[inline]
     fn snap(&self, mut index: usize) -> usize {
+        // Safety:
+        // - The call to `min()` brings the index in bounds
+        // - After the while loop, the index must be on a codepoint boundary
+        // - `index` cannot underflow because 0 is always a codepoint boundary
         index = index.min(self.string.len());
         while !self.string.is_char_boundary(index) {
             index -= 1;
@@ -276,7 +346,7 @@ impl Debug for Scanner<'_> {
 /// |------------------------|-----------------------------------|
 /// | `char`                 | `scanner.at('a')`                 |
 /// | `&str`                 | `scanner.at("hello")`             |
-/// | `[char: N]`, `&[char]` | `scanner.at(['a', 'b', 'c'])`     |
+/// | `[char; N]`, `&[char]` | `scanner.at(['a', 'b', 'c'])`     |
 /// | `FnMut(char) -> bool`  | `scanner.at(char::is_alphabetic)` |
 /// | `FnMut(&char) -> bool` | `scanner.at(char::is_ascii)`      |
 ///
@@ -306,6 +376,9 @@ impl Pattern<()> for char {}
 unsafe impl Sealed<()> for char {
     #[inline]
     fn matches(&mut self, string: &str) -> Option<usize> {
+        // Safety: When the string starts with the needle, there must be an
+        // in-bounds codepoint boundary at `needle.len()` bytes into the
+        // string.
         let mut buf = [0; 4];
         let needle = &*self.encode_utf8(&mut buf);
         string.starts_with(needle).then(|| needle.len())
@@ -321,6 +394,8 @@ impl Pattern<()> for &str {}
 unsafe impl Sealed<()> for &str {
     #[inline]
     fn matches(&mut self, string: &str) -> Option<usize> {
+        // Safety: When the string starts with the `self`, there must be an
+        // in-bounds codepoint boundary at `self.len()` bytes into the string.
         string.starts_with(&*self).then(|| self.len())
     }
 
@@ -334,6 +409,9 @@ impl Pattern<()> for &[char] {}
 unsafe impl Sealed<()> for &[char] {
     #[inline]
     fn matches(&mut self, string: &str) -> Option<usize> {
+        // Safety: When the `string` starts with `next`, there must be an
+        // in-bounds codepoint boundary at `next.len_utf8()` bytes into the
+        // string.
         let next = string.chars().next()?;
         self.iter().any(|&c| c == next).then(|| next.len_utf8())
     }
@@ -397,6 +475,9 @@ where
 {
     #[inline]
     fn matches(&mut self, string: &str) -> Option<usize> {
+        // Safety: When the `string` starts with `next`, there must be an
+        // in-bounds codepoint boundary at `next.len_utf8()` bytes into the
+        // string.
         string.chars().next().filter(|&c| self(c)).map(char::len_utf8)
     }
 
@@ -413,6 +494,9 @@ where
 {
     #[inline]
     fn matches(&mut self, string: &str) -> Option<usize> {
+        // Safety: When the `string` starts with `next`, there must be an
+        // in-bounds codepoint boundary at `next.len_utf8()` bytes into the
+        // string.
         string.chars().next().filter(self).map(char::len_utf8)
     }
 
