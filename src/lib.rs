@@ -421,3 +421,199 @@ where
         panic!("expected closure to return `true`");
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::Scanner;
+
+    #[test]
+    fn test_fmt() {
+        let mut s = Scanner::new("hello world");
+        assert_eq!(format!("{s:?}"), r#"Scanner(| "hello world")"#);
+        s.eat_while(char::is_alphabetic);
+        assert_eq!(format!("{s:?}"), r#"Scanner("hello" | " world")"#);
+        s.eat_while(|_| true);
+        assert_eq!(format!("{s:?}"), r#"Scanner("hello world" |)"#);
+    }
+
+    #[test]
+    fn test_empty() {
+        let mut s = Scanner::new("");
+        s.jump(10);
+        assert_eq!(s.cursor(), 0);
+        assert_eq!(s.done(), true);
+        assert_eq!(s.before(), "");
+        assert_eq!(s.after(), "");
+        assert_eq!(s.from(0), "");
+        assert_eq!(s.from(10), "");
+        assert_eq!(s.to(10), "");
+        assert_eq!(s.to(10), "");
+        assert_eq!(s.get(10 .. 20), "");
+        assert_eq!(s.at(""), true);
+        assert_eq!(s.at('a'), false);
+        assert_eq!(s.at(|_| true), false);
+        assert_eq!(s.scout(-1), None);
+        assert_eq!(s.scout(-1), None);
+        assert_eq!(s.scout(1), None);
+        assert_eq!(s.locate(-1), 0);
+        assert_eq!(s.locate(0), 0);
+        assert_eq!(s.locate(1), 0);
+        assert_eq!(s.eat(), None);
+        assert_eq!(s.uneat(), None);
+        assert_eq!(s.eat_if(""), true);
+        assert_eq!(s.eat_if('a'), false);
+        assert_eq!(s.eat_while(""), "");
+        assert_eq!(s.eat_while('a'), "");
+        assert_eq!(s.eat_until(""), "");
+        assert_eq!(s.eat_whitespace(), "");
+    }
+
+    #[test]
+    fn test_slice() {
+        let mut s = Scanner::new("zoo 🦍🌴🎍 party");
+        assert_eq!(s.parts(), ("", "zoo 🦍🌴🎍 party"));
+        assert_eq!(s.get(2 .. 9), "o 🦍");
+        assert_eq!(s.get(2 .. 22), "o 🦍🌴🎍 party");
+        s.eat_while(char::is_ascii);
+        assert_eq!(s.parts(), ("zoo ", "🦍🌴🎍 party"));
+        assert_eq!(s.from(1), "oo ");
+        assert_eq!(s.to(15), "🦍🌴");
+        assert_eq!(s.to(16), "🦍🌴🎍");
+        assert_eq!(s.to(17), "🦍🌴🎍 ");
+        assert_eq!(s.to(usize::MAX), "🦍🌴🎍 party");
+        s.eat_until(char::is_whitespace);
+        assert_eq!(s.parts(), ("zoo 🦍🌴🎍", " party"));
+        assert_eq!(s.from(3), " 🦍🌴🎍");
+    }
+
+    #[test]
+    fn test_done_and_peek() {
+        let mut s = Scanner::new("äbc");
+        assert_eq!(s.done(), false);
+        assert_eq!(s.peek(), Some('ä'));
+        s.eat();
+        assert_eq!(s.done(), false);
+        assert_eq!(s.peek(), Some('b'));
+        s.eat();
+        assert_eq!(s.done(), false);
+        assert_eq!(s.peek(), Some('c'));
+        s.eat();
+        assert_eq!(s.done(), true);
+        assert_eq!(s.peek(), None);
+    }
+
+    #[test]
+    fn test_at() {
+        let mut s = Scanner::new("Ђ12");
+        assert!(s.at('Ђ'));
+        assert!(s.at(['b', 'Ђ', 'Њ']));
+        assert!(s.at("Ђ"));
+        assert!(s.at("Ђ1"));
+        assert!(s.at(char::is_alphabetic));
+        assert!(!s.at(&['b', 'c']));
+        assert!(!s.at("a13"));
+        assert!(!s.at(char::is_numeric));
+        s.eat();
+        assert!(s.at(char::is_numeric));
+        assert!(s.at(char::is_ascii_digit));
+    }
+
+    #[test]
+    fn test_scout_and_locate() {
+        let mut s = Scanner::new("a🐆c1Ф");
+        s.eat_until(char::is_numeric);
+        assert_eq!(s.scout(-4), None);
+        assert_eq!(s.scout(-3), Some('a'));
+        assert_eq!(s.scout(-2), Some('🐆'));
+        assert_eq!(s.scout(-1), Some('c'));
+        assert_eq!(s.scout(0), Some('1'));
+        assert_eq!(s.scout(1), Some('Ф'));
+        assert_eq!(s.scout(2), None);
+        assert_eq!(s.locate(-4), 0);
+        assert_eq!(s.locate(-3), 0);
+        assert_eq!(s.locate(-2), 1);
+        assert_eq!(s.locate(-1), 5);
+        assert_eq!(s.locate(0), 6);
+        assert_eq!(s.locate(1), 7);
+        assert_eq!(s.locate(2), 9);
+        assert_eq!(s.locate(3), 9);
+    }
+
+    #[test]
+    fn test_eat_and_uneat() {
+        let mut s = Scanner::new("🐶🐱🐭");
+        assert_eq!(s.eat(), Some('🐶'));
+        s.jump(usize::MAX);
+        assert_eq!(s.uneat(), Some('🐭'));
+        assert_eq!(s.uneat(), Some('🐱'));
+        assert_eq!(s.uneat(), Some('🐶'));
+        assert_eq!(s.uneat(), None);
+        assert_eq!(s.eat(), Some('🐶'));
+    }
+
+    #[test]
+    fn test_conditional_and_looping() {
+        let mut s = Scanner::new("abc123def33");
+        assert_eq!(s.eat_if('b'), false);
+        assert_eq!(s.eat_if('a'), true);
+        assert_eq!(s.eat_while(['a', 'b', 'c']), "bc");
+        assert_eq!(s.eat_while(char::is_numeric), "123");
+        assert_eq!(s.eat_until(char::is_numeric), "def");
+        assert_eq!(s.eat_while('3'), "33");
+    }
+
+    #[test]
+    fn test_eat_whitespace() {
+        let mut s = Scanner::new("ሙም  \n  b\tቂ");
+        assert_eq!(s.eat_whitespace(), "");
+        assert_eq!(s.eat_while(char::is_alphabetic), "ሙም");
+        assert_eq!(s.eat_whitespace(), "  \n  ");
+        assert_eq!(s.eat_if('b'), true);
+        assert_eq!(s.eat_whitespace(), "\t");
+        assert_eq!(s.eat_while(char::is_alphabetic), "ቂ");
+    }
+
+    #[test]
+    fn test_expect_okay() {
+        let mut s = Scanner::new("🦚12");
+        s.expect('🦚');
+        s.jump(1);
+        s.expect("🦚");
+        assert_eq!(s.after(), "12");
+    }
+
+    #[test]
+    #[should_panic(expected = "expected '🐢'")]
+    fn test_expect_char_fail() {
+        let mut s = Scanner::new("no turtle in sight");
+        s.expect('🐢');
+    }
+
+    #[test]
+    #[should_panic(expected = "expected \"🐢\"")]
+    fn test_expect_str_fail() {
+        let mut s = Scanner::new("no turtle in sight");
+        s.expect("🐢");
+    }
+
+    #[test]
+    #[should_panic(expected = "empty slice cannot match")]
+    fn test_expect_empty_array_fail() {
+        let mut s = Scanner::new("");
+        s.expect([]);
+    }
+
+    #[test]
+    #[should_panic(expected = "expected '🐢' or '🐬'")]
+    fn test_expect_array_fail() {
+        let mut s = Scanner::new("no turtle or dolphin in sight");
+        s.expect(['🐢', '🐬']);
+    }
+
+    #[test]
+    #[should_panic(expected = "expected closure to return `true`")]
+    fn test_expect_closure_fail() {
+        let mut s = Scanner::new("no numbers in sight");
+        s.expect(char::is_numeric);
+    }
+}
