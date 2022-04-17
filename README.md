@@ -9,9 +9,9 @@ Painless string scanning.
 unscanny = "0.1"
 ```
 
-Basically, you want to use this if right now you're manually dealing with a
-`chars()` iterator but it's too much pain. More broadly speaking, it's
-useful in the following two situations:
+Basically, you'll want to use this crate if it's too much pain to solve your
+problem with a bare `chars()` iterator. Speaking more broadly, `unscanny` is
+useful in these situations:
 - You need to parse simple flat grammars (dates, times, custom stuff, ...) and
   want an interface that's a bit more convenient to use than a simple char
   iterator.
@@ -41,7 +41,7 @@ assert_eq!(nums, [12.0, -15.3, 14.3]);
 ```
 
 ## Safety
-This crate uses unsafe code internally for better performance. However, all
+This crate internally uses unsafe code for better performance. However, all
 unsafe code is documented with justification why its safe, all accesses are
 checked in debug mode and everything is tested.
 

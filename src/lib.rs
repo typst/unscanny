@@ -1,9 +1,9 @@
 /*!
 Painless string scanning.
 
-Basically, you want to use this if right now you're manually dealing with a
-`chars()` iterator but it's too much pain. More broadly speaking, it's
-useful in the following two situations:
+Basically, you'll want to use this crate if it's too much pain to solve your
+problem with a bare `chars()` iterator. Speaking more broadly, `unscanny` is
+useful in these situations:
 - You need to parse simple flat grammars (dates, times, custom stuff, ...) and
   want an interface that's a bit more convenient to use than a simple char
   iterator.
@@ -75,7 +75,7 @@ impl<'a> Scanner<'a> {
         self.cursor
     }
 
-    /// Whether the cursor is at the end of the string.
+    /// Whether the scanner has fully consumed the string.
     #[inline]
     pub fn done(&self) -> bool {
         self.cursor == self.string.len()
@@ -352,10 +352,9 @@ impl Debug for Scanner<'_> {
 ///
 /// As you might have noticed, this closely mirrors the
 /// [`Pattern`](std::str::pattern::Pattern) trait from the standard library.
-/// This trait is unfortunately unstable though, so we can't use it in the
-/// scanner's method signatures. Furthermore, it doesn't support passing `&char`
-/// functions which is quite useful because some char methods take `self` by
-/// reference.
+/// Unfortunately, this trait is unstable, so we can't use it in the scanner's
+/// method signatures. Furthermore, it doesn't support passing `&char` functions
+/// which is quite useful because some char methods take `self` by reference.
 pub trait Pattern<T>: Sealed<T> {}
 
 use sealed::Sealed;
