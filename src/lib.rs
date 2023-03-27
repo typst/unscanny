@@ -86,7 +86,7 @@ impl<'a> Scanner<'a> {
     pub fn before(&self) -> &'a str {
         // Safety: The cursor is always in-bounds and on a codepoint boundary.
         debug_assert!(self.string.is_char_boundary(self.cursor));
-        unsafe { self.string.get_unchecked(.. self.cursor) }
+        unsafe { self.string.get_unchecked(..self.cursor) }
     }
 
     /// The subslice after the cursor.
@@ -94,7 +94,7 @@ impl<'a> Scanner<'a> {
     pub fn after(&self) -> &'a str {
         // Safety: The cursor is always in-bounds and on a codepoint boundary.
         debug_assert!(self.string.is_char_boundary(self.cursor));
-        unsafe { self.string.get_unchecked(self.cursor ..) }
+        unsafe { self.string.get_unchecked(self.cursor..) }
     }
 
     /// The subslices before and after the cursor.
@@ -116,7 +116,7 @@ impl<'a> Scanner<'a> {
         let start = self.snap(start).min(self.cursor);
         debug_assert!(self.string.is_char_boundary(start));
         debug_assert!(self.string.is_char_boundary(self.cursor));
-        unsafe { self.string.get_unchecked(start .. self.cursor) }
+        unsafe { self.string.get_unchecked(start..self.cursor) }
     }
 
     /// The subslice from the cursor to `end`.
@@ -132,7 +132,7 @@ impl<'a> Scanner<'a> {
         let end = self.snap(end).max(self.cursor);
         debug_assert!(self.string.is_char_boundary(self.cursor));
         debug_assert!(self.string.is_char_boundary(end));
-        unsafe { self.string.get_unchecked(self.cursor .. end) }
+        unsafe { self.string.get_unchecked(self.cursor..end) }
     }
 
     /// The subslice from the `start` to `end`.
@@ -148,7 +148,7 @@ impl<'a> Scanner<'a> {
         let end = self.snap(range.end).max(start);
         debug_assert!(self.string.is_char_boundary(start));
         debug_assert!(self.string.is_char_boundary(end));
-        unsafe { self.string.get_unchecked(start .. end) }
+        unsafe { self.string.get_unchecked(start..end) }
     }
 
     /// The character right behind the cursor.
@@ -189,7 +189,7 @@ impl<'a> Scanner<'a> {
     pub fn locate(&self, n: isize) -> usize {
         if n >= 0 {
             let mut chars = self.after().chars();
-            for _ in 0 .. n {
+            for _ in 0..n {
                 if chars.next().is_none() {
                     break;
                 }
@@ -197,7 +197,7 @@ impl<'a> Scanner<'a> {
             self.string.len() - chars.as_str().len()
         } else {
             let mut chars = self.before().chars();
-            for _ in 0 .. -n {
+            for _ in 0..-n {
                 if chars.next_back().is_none() {
                     break;
                 }
@@ -252,7 +252,7 @@ impl<'a> Scanner<'a> {
     #[inline]
     pub fn eat_while<T>(&mut self, mut pat: impl Pattern<T>) -> &'a str {
         let start = self.cursor;
-        while let Some(len @ 1 ..) = pat.matches(self.after()) {
+        while let Some(len @ 1..) = pat.matches(self.after()) {
             // Safety: The contract of `matches` guarantees that there is an
             // in-bounds codepoint boundary at `len` bytes into `self.after()`.
             self.cursor += len;
@@ -531,7 +531,7 @@ mod tests {
         assert_eq!(s.from(10), "");
         assert_eq!(s.to(10), "");
         assert_eq!(s.to(10), "");
-        assert_eq!(s.get(10 .. 20), "");
+        assert_eq!(s.get(10..20), "");
         assert_eq!(s.at(""), true);
         assert_eq!(s.at('a'), false);
         assert_eq!(s.at(|_| true), false);
@@ -555,8 +555,8 @@ mod tests {
     fn test_slice() {
         let mut s = Scanner::new("zoo 🦍🌴🎍 party");
         assert_eq!(s.parts(), ("", "zoo 🦍🌴🎍 party"));
-        assert_eq!(s.get(2 .. 9), "o 🦍");
-        assert_eq!(s.get(2 .. 22), "o 🦍🌴🎍 party");
+        assert_eq!(s.get(2..9), "o 🦍");
+        assert_eq!(s.get(2..22), "o 🦍🌴🎍 party");
         s.eat_while(char::is_ascii);
         assert_eq!(s.parts(), ("zoo ", "🦍🌴🎍 party"));
         assert_eq!(s.from(1), "oo ");
