@@ -18,7 +18,7 @@ useful in these situations:
 - You're hand-writing a tokenizer.
 
 The `Scanner` keeps an internal cursor, allows you to peek around it, advance it
-beyond chars or other patterns  and easily slice substrings before and after the
+beyond chars or other patterns and easily slice substrings before and after the
 cursor.
 
 # Example
@@ -42,7 +42,7 @@ assert_eq!(nums, [12.0, -15.3, 14.3]);
 
 ## Safety
 This crate internally uses unsafe code for better performance. However, all
-unsafe code is documented with justification why its safe, all accesses are
+unsafe code is documented with justification for why it's safe, all accesses are
 checked in debug mode and everything is tested.
 
 ## License
