@@ -5,7 +5,17 @@ jobs:
   ci:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@d5e4d57b030548f435d0befec15ff413a2c60eff # v1.100.0
       - run: cargo build
       - run: cargo test
+
+  licenses:
+    name: Check licenses
+    runs-on: ubuntu-slim
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@d5e4d57b030548f435d0befec15ff413a2c60eff # v1.100.0
+      - uses: typst/notices@0e44c240da489017e8766ed80eab2d03b2833a0c # v0.1.2
+        with:
+          args: check --deps --allow-missing
